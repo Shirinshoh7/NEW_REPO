@@ -8,65 +8,63 @@ import uvicorn
 
 from .config import settings
 from .services.mqtt_service import mqtt_service
+from .services.firebase_service import firebase_service
 from .core.storage import storage
 
 # Импорт роутеров
-from .api.routes import climate, profiles, history, test
+from .api.routes import climate, profiles, history, test, push
 
 
-# Создание FastAPI приложения
 app = FastAPI(
     title=settings.APP_NAME,
-    description="Real-Time IoT Backend с MQTT и WebSocket (4 параметра)",
+    description="Real-Time IoT Backend с MQTT и WebSocket (5 параметров)",
     version=settings.APP_VERSION
 )
 
-# CORS
+# ✅ CORS для Flutter Web / Chrome (DEV)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=["*"],          # DEV: разрешить все домены
+    allow_credentials=False,      # MUST be False when allow_origins=["*"]
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
+
 
 # Подключение роутеров
 app.include_router(climate.router)
 app.include_router(profiles.router)
 app.include_router(history.router)
 app.include_router(test.router)
+app.include_router(push.router)
 
 
 @app.on_event("startup")
 async def startup_event():
-    """Запуск при старте сервера"""
     print("\n" + "=" * 70)
     print(f"🚀 {settings.APP_NAME} v{settings.APP_VERSION}")
     print("=" * 70)
-    print("📊 Поддерживаемые параметры:")
-    print("   • Температура (°C)")
-    print("   • Влажность (%)")
-    print("   • CO2 (ppm)")
-    print("   • Освещенность (lux)")
-    print("=" * 70)
-    
+
+    # Инициализация Firebase/FCM
+    firebase_service.init_firebase()
+
     # Настройка и запуск MQTT
-    event_loop = asyncio.get_event_loop()
-    mqtt_service.setup(event_loop)
-    
+    loop = asyncio.get_event_loop()
+    mqtt_service.setup(loop)
+
     if mqtt_service.connect():
-        print(f"✅ MQTT клиент запущен")
+        print("✅ MQTT клиент запущен")
         print(f"📡 HiveMQ Cloud: {settings.MQTT_HOST}:{settings.MQTT_PORT}")
         print(f"📬 Топик: {settings.MQTT_TOPIC}")
     else:
         print("⚠️ Backend работает без MQTT")
-    
+
     print("=" * 70 + "\n")
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    """Остановка при выключении"""
     print("\n🛑 Остановка сервиса...")
     mqtt_service.disconnect()
     print("✅ Сервис остановлен")
@@ -74,12 +72,11 @@ async def shutdown_event():
 
 @app.get("/")
 async def root():
-    """Информация о сервере"""
     return {
         "service": settings.APP_NAME,
         "version": settings.APP_VERSION,
         "status": "online",
-        "parameters": ["temperature", "humidity", "co2_ppm", "lux"],
+        "parameters": ["temperature", "humidity", "co2_ppm", "co_ppm", "lux"],
         "mqtt": {
             "broker": settings.MQTT_HOST,
             "port": settings.MQTT_PORT,
@@ -93,26 +90,12 @@ async def root():
 
 
 if __name__ == "__main__":
-    print("\n" + "=" * 70)
-    print(f"🚀 {settings.APP_NAME}")
-    print("=" * 70)
-    print("📊 Поддерживает 4 параметра:")
-    print("   • 🌡️  Температура")
-    print("   • 💧 Влажность")
-    print("   • 💨 CO2")
-    print("   • ☀️  Освещенность (Lux)")
-    print("=" * 70)
-    print(f"\n🌐 HTTP API: http://{settings.SERVER_HOST}:{settings.SERVER_PORT}")
-    print(f"🔌 WebSocket: ws://{settings.SERVER_HOST}:{settings.SERVER_PORT}/api/ws/realtime")
-    print(f"📚 Docs: http://{settings.SERVER_HOST}:{settings.SERVER_PORT}/docs")
-    print(f"\n💡 Тест: POST http://{settings.SERVER_HOST}:{settings.SERVER_PORT}/api/test/inject")
-    print("\n⚠️  Нажмите CTRL+C для остановки\n")
-    print("=" * 70 + "\n")
-    
     uvicorn.run(
         "app.main:app",
-        host=settings.SERVER_HOST,
+        host=settings.SERVER_HOST,     # совет: поставь 0.0.0.0 если нужно с телефона
         port=settings.SERVER_PORT,
         reload=settings.DEBUG,
-        log_level="info"
+        log_level="info",
+        ws_ping_interval=30,
+        ws_ping_timeout=60,
     )

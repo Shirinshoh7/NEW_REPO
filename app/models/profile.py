@@ -11,6 +11,7 @@ class Profile(BaseModel):
     temp_max: float = Field(..., description="Максимальная температура")
     humidity_max: float = Field(..., description="Максимальная влажность")
     co2_max: float = Field(..., description="Максимальный CO2")
+    co_max: float = Field(..., description="Максимальный CO")
     lux_min: float = Field(..., description="Минимальная освещенность")
     lux_max: float = Field(..., description="Максимальная освещенность")
 

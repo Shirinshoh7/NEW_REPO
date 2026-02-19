@@ -1,0 +1,11 @@
+{
+  "name": "❄️ Холодная комната",
+  "temp_min": 4.0,
+  "temp_max": 8.0,
+  "humidity_min": 0.0,
+  "humidity_max": 80.0,
+  "co2_max": 800,
+  "co_max": 20,
+  "lux_min": 200.0,
+  "lux_max": 4000.0
+}

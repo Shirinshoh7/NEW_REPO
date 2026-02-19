@@ -8,12 +8,13 @@ class AIService:
     """Сервис AI прогнозов"""
     
     @staticmethod
-    def predict_linear(data_points: List[float]) -> float:
+    def predict_linear(data_points: List[float], steps_ahead: int = 1) -> float:
         """
         Линейная регрессия для прогноза
         
         Args:
             data_points: Список исторических значений
+            steps_ahead: На сколько шагов вперед прогноз
             
         Returns:
             Прогнозируемое значение
@@ -30,11 +31,16 @@ class AIService:
             sum_xy += i * data_points[i]
             sum_xx += i * i
         
-        slope = (n * sum_xy - sum_x * sum_y) / (n * sum_xx - sum_x * sum_x)
+        denominator = (n * sum_xx - sum_x * sum_x)
+        if denominator == 0:
+            return round(data_points[-1], 1)
+
+        slope = (n * sum_xy - sum_x * sum_y) / denominator
         intercept = (sum_y - slope * sum_x) / n
         
-        # Прогноз на 5 шагов вперед
-        prediction = slope * (n + 5) + intercept
+        # Прогноз на N шагов вперед
+        steps = max(1, int(steps_ahead))
+        prediction = slope * (n + steps) + intercept
         
         return round(prediction, 1)
     
@@ -57,6 +63,7 @@ class AIService:
         temp = current_data["temperature"]
         hum = current_data["humidity"]
         co2 = current_data["co2_ppm"]
+        co = current_data["co_ppm"]
         lux = current_data["lux"]
         
         # Штрафы за выход из нормы
@@ -66,6 +73,9 @@ class AIService:
             score -= 15
         if co2 > profile["co2_max"]:
             score -= 20
+        co_max = profile.get("co_max")
+        if co_max is not None and co > co_max:
+            score -= 25
         if lux < profile["lux_min"] or lux > profile["lux_max"]:
             score -= 10
         

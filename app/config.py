@@ -24,6 +24,12 @@ class Settings(BaseSettings):
     APP_NAME: str = "MicroClimate AI Pro Backend"
     APP_VERSION: str = "2.1.0"
     DEBUG: bool = True
+
+    # Firebase / FCM
+    FCM_ENABLED: bool = False
+    FIREBASE_CREDENTIALS_PATH: Optional[str] = None
+    FCM_DANGER_REMINDER_SEC: int = 300
+    FCM_DEFAULT_USER_ID: str = "user_1"
     
     class Config:
         env_file = ".env"

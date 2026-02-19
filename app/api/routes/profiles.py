@@ -29,7 +29,7 @@ async def update_profile(profile: dict):
     Returns:
         Статус операции
     """
-    required = ["name", "temp_min", "temp_max", "humidity_max", "co2_max", "lux_min", "lux_max"]
+    required = ["name", "temp_min", "temp_max", "humidity_max", "co2_max", "co_max", "lux_min", "lux_max"]
     
     for field in required:
         if field not in profile:

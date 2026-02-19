@@ -8,14 +8,22 @@ from ...services.websocket_service import websocket_service
 
 router = APIRouter(prefix="/api", tags=["climate"])
 
+SUPPORTED_HORIZONS_MIN = {
+    "30m": 30,
+    "3h": 180,
+    "24h": 1440,
+}
+SAMPLE_PERIOD_MIN = 5
+
 
 @router.get("/now")
-async def get_current_data(forecast_min: int = 5):
+async def get_current_data(forecast: str = "30m", forecast_min: int | None = None):
     """
     Получение текущих данных с AI прогнозом
     
     Args:
-        forecast_min: Время прогноза в минутах
+        forecast: Горизонт прогноза ("30m", "3h", "24h")
+        forecast_min: Время прогноза в минутах (приоритетнее forecast)
         
     Returns:
         Текущие данные и прогнозы
@@ -26,17 +34,27 @@ async def get_current_data(forecast_min: int = 5):
             "message": "Нет данных от ESP32. Проверьте MQTT."
         }
     
+    # Определение горизонта прогноза
+    if forecast_min is not None:
+        target_minutes = max(1, int(forecast_min))
+    else:
+        target_minutes = SUPPORTED_HORIZONS_MIN.get(forecast, 30)
+
+    steps_ahead = max(1, round(target_minutes / SAMPLE_PERIOD_MIN))
+
     # AI прогноз для всех параметров
-    temp_history = [d["temp"] for d in storage.data_history]
-    hum_history = [d["hum"] for d in storage.data_history]
-    co2_history = [d["co2"] for d in storage.data_history]
-    lux_history = [d["lux"] for d in storage.data_history]
+    temp_history = [float(d.get("temp", d.get("temperature", 0))) for d in storage.data_history]
+    hum_history = [float(d.get("hum", d.get("humidity", 0))) for d in storage.data_history]
+    co2_history = [float(d.get("co2", d.get("co2_ppm", 0))) for d in storage.data_history]
+    co_history = [float(d.get("co", d.get("co_ppm", 0))) for d in storage.data_history]
+    lux_history = [float(d.get("lux", 0)) for d in storage.data_history]
     
     predictions = {
-        "temperature": ai_service.predict_linear(temp_history),
-        "humidity": ai_service.predict_linear(hum_history),
-        "co2": ai_service.predict_linear(co2_history),
-        "lux": ai_service.predict_linear(lux_history)
+        "temperature": ai_service.predict_linear(temp_history, steps_ahead),
+        "humidity": ai_service.predict_linear(hum_history, steps_ahead),
+        "co2": ai_service.predict_linear(co2_history, steps_ahead),
+        "co": ai_service.predict_linear(co_history, steps_ahead),
+        "lux": ai_service.predict_linear(lux_history, steps_ahead)
     }
     
     # MC Score
@@ -50,10 +68,17 @@ async def get_current_data(forecast_min: int = 5):
             "temp": storage.current_data["temperature"],
             "hum": storage.current_data["humidity"],
             "co2": storage.current_data["co2_ppm"],
+            "co": storage.current_data["co_ppm"],
             "lux": storage.current_data["lux"],
             "mc_score": mc_score
         },
         "predictions": predictions,
+        "forecast": {
+            "label": forecast if forecast in SUPPORTED_HORIZONS_MIN else f"{target_minutes}m",
+            "minutes": target_minutes,
+            "steps_ahead": steps_ahead,
+            "sample_period_min": SAMPLE_PERIOD_MIN,
+        },
         "device_id": storage.current_data["device_id"],
         "timestamp": storage.current_data["timestamp"],
         "profile": storage.active_profile["name"]
@@ -66,10 +91,11 @@ async def get_statistics():
     if len(storage.data_history) == 0:
         return {"error": "no_data"}
     
-    temps = [d["temp"] for d in storage.data_history]
-    hums = [d["hum"] for d in storage.data_history]
-    co2s = [d["co2"] for d in storage.data_history]
-    luxs = [d["lux"] for d in storage.data_history]
+    temps = [float(d.get("temp", d.get("temperature", 0))) for d in storage.data_history]
+    hums = [float(d.get("hum", d.get("humidity", 0))) for d in storage.data_history]
+    co2s = [float(d.get("co2", d.get("co2_ppm", 0))) for d in storage.data_history]
+    cos = [float(d.get("co", d.get("co_ppm", 0))) for d in storage.data_history]
+    luxs = [float(d.get("lux", 0)) for d in storage.data_history]
     
     return {
         "measurements": len(storage.data_history),
@@ -90,6 +116,12 @@ async def get_statistics():
             "min": min(co2s),
             "max": max(co2s),
             "avg": round(sum(co2s) / len(co2s), 1)
+        },
+        "co": {
+            "current": storage.current_data["co_ppm"],
+            "min": min(cos),
+            "max": max(cos),
+            "avg": round(sum(cos) / len(cos), 1)
         },
         "lux": {
             "current": storage.current_data["lux"],

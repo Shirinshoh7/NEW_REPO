@@ -11,6 +11,7 @@ class ClimateData(BaseModel):
     temperature: float = Field(..., description="Температура в °C")
     humidity: float = Field(..., description="Влажность в %")
     co2_ppm: float = Field(..., description="CO2 в ppm")
+    co_ppm: float = Field(..., description="CO в ppm")
     lux: float = Field(..., description="Освещенность в люксах")
     device_id: Optional[str] = Field("esp32_main", description="ID устройства")
 
@@ -29,6 +30,7 @@ class PredictionsData(BaseModel):
     temperature: float
     humidity: float
     co2: float
+    co: float
     lux: float
 
 
@@ -37,5 +39,6 @@ class CurrentData(BaseModel):
     temp: float
     hum: float
     co2: float
+    co: float
     lux: float
     mc_score: int

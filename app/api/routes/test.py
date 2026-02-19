@@ -25,6 +25,7 @@ async def inject_test_data(data: dict = None):
             "temperature": 22.5,
             "humidity": 45.0,
             "co2_ppm": 750.0,
+            "co_ppm": 12.0,
             "lux": 320.0
         }
     
